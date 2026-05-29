@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# claude-codex — bridge-holic launcher
+#
+# Starts claude-code-proxy-headless if not running, then launches Claude Code
+# with ANTHROPIC_BASE_URL pointing at the proxy so all model requests go to Codex.
+#
+# Environment variables (all optional — defaults shown):
+#   BRIDGE_HOLIC_PROXY_BIN   path to claude-code-proxy-headless binary
+#                            default: $HOME/.local/bin/claude-code-proxy-headless
+#   CLAUDE_CODE_PROXY_PORT   proxy listen port        default: 18765
+#   CLAUDE_CODE_PROXY_MODEL  main Codex model         default: gpt-5.4
+#   CLAUDE_CODE_PROXY_SMALL  small/fast model         default: gpt-5.4-mini
+#
+# Usage: claude-codex [--full-tools] [claude args...]
+#   --full-tools   enable all Claude Code tools (MCP, Agent, etc.)
+#                  default: light tool set (Bash,Read,Edit,Write)
+
+set -euo pipefail
+
+PROXY_BIN="${BRIDGE_HOLIC_PROXY_BIN:-$HOME/.local/bin/claude-code-proxy-headless}"
+PROXY_PORT="${CLAUDE_CODE_PROXY_PORT:-18765}"
+PROXY_URL="http://127.0.0.1:${PROXY_PORT}"
+CODEX_MODEL="${CLAUDE_CODE_PROXY_MODEL:-gpt-5.4}"
+CODEX_SMALL="${CLAUDE_CODE_PROXY_SMALL:-gpt-5.4-mini}"
+TOOL_MODE="light"
+LIGHT_TOOLS="Bash,Read,Edit,Write"
+
+claude_extra_args=()
+passthrough_args=()
+while (( $# > 0 )); do
+  case "$1" in
+    --full-tools)
+      TOOL_MODE="full"
+      shift ;;
+    *)
+      passthrough_args+=("$1")
+      shift ;;
+  esac
+done
+
+# ── ensure proxy is running ────────────────────────────────────────────────────
+if ! curl -sf --max-time 1 "${PROXY_URL}/healthz" >/dev/null 2>&1; then
+  if [[ ! -x "$PROXY_BIN" ]]; then
+    echo "ERROR: claude-code-proxy-headless not found at $PROXY_BIN" >&2
+    echo "Install it first: https://github.com/raine/claude-code-proxy" >&2
+    exit 1
+  fi
+  echo "Starting claude-code-proxy..." >&2
+  PORT="$PROXY_PORT" CCP_AUTH_STORE=file CCP_CODEX_IMPORT_CODEX_AUTH=1 \
+    "$PROXY_BIN" serve >> /tmp/ccp.log 2>&1 &
+  for _ in {1..30}; do
+    curl -sf --max-time 1 "${PROXY_URL}/healthz" >/dev/null 2>&1 && break
+    sleep 0.2
+  done
+  if ! curl -sf --max-time 1 "${PROXY_URL}/healthz" >/dev/null 2>&1; then
+    echo "ERROR: proxy did not start. Check /tmp/ccp.log" >&2
+    exit 1
+  fi
+fi
+
+# ── build settings JSON ────────────────────────────────────────────────────────
+SETTINGS=$(python3 -c "
+import json, sys
+print(json.dumps({
+    'permissions': {'defaultMode': 'bypassPermissions'},
+    'skipDangerousModePermissionPrompt': True,
+    'env': {
+        'ANTHROPIC_BASE_URL': '$PROXY_URL',
+        'ANTHROPIC_AUTH_TOKEN': 'unused',
+        'ANTHROPIC_MODEL': '$CODEX_MODEL',
+        'ANTHROPIC_SMALL_FAST_MODEL': '$CODEX_SMALL',
+        'CLAUDE_CODE_DISABLE_NONSTREAMING_FALLBACK': '1',
+    }
+}, separators=(',', ':')))
+")
+
+if [[ "$TOOL_MODE" == "light" ]]; then
+  claude_extra_args+=(--strict-mcp-config --tools "$LIGHT_TOOLS")
+fi
+
+claude_extra_args+=(
+  --disallowedTools "Task(codex-research),Task(codex-reader),Task(codex-coder),Task(codex-reviewer)"
+)
+
+exec claude \
+  --settings "$SETTINGS" \
+  --model "$CODEX_MODEL" \
+  "${claude_extra_args[@]}" \
+  "${passthrough_args[@]}"

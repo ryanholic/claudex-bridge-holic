@@ -1,0 +1,12 @@
+{
+  "_note": "raine/claude-code-proxy passes model names directly to OpenAI — no alias mapping needed.",
+  "_note2": "See https://github.com/raine/claude-code-proxy for full setup and config options.",
+
+  "_usage": "Set OPENAI_API_KEY env var, then run: claude-code-proxy-headless serve",
+
+  "_models_used_by_bridge_holic": [
+    "gpt-5.4-mini",
+    "gpt-5.4",
+    "gpt-5.5"
+  ]
+}
