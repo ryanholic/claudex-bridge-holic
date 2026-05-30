@@ -139,7 +139,7 @@ def _spawn_summarizer(state_path: Path, raw_title: str, emoji: str) -> None:
         f"prompt = {prompt!r}\n"
         "try:\n"
         "    r = subprocess.run(\n"
-        "        [codex, '--ignore-user-config', '--no-session-persistence', '-p', prompt],\n"
+        "        [codex, '--no-session-persistence', '-p', prompt],\n"
         "        capture_output=True, text=True, timeout=60\n"
         "    )\n"
         "    title = (r.stdout or '').strip().splitlines()[0].strip()\n"
