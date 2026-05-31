@@ -165,19 +165,28 @@ def main() -> None:
     except OSError:
         pass
 
-    # /codex-off 명시 시: CCP 힌트 대신 "Claude 직접 처리" 힌트로 교체
     from pathlib import Path as _Path
-    native_flag = _Path.home() / f".claude/codex_native_on_{session_id}"
-    if native_flag.exists():
+
+    # Codex 모드 ON 감지: ~/.claude/codex_mode_on_{session_id} 파일 존재 여부
+    # 환경변수 CLAUDE_SESSION_ID 우선, 없으면 ctx의 session_id 사용
+    env_session_id = os.environ.get("CLAUDE_SESSION_ID", "")
+    codex_mode_session = env_session_id if env_session_id else session_id
+    codex_mode_flag = _Path.home() / f".claude/codex_mode_on_{codex_mode_session}"
+
+    if codex_mode_flag.exists():
+        # Codex 모드 ON: tier 무관하게 강제 위임 힌트 주입
+        # (codex_mode_reminder.sh가 이미 상세 메시지를 출력하므로 여기서는 짧게)
         print(
             json.dumps(
                 {
                     "hookSpecificOutput": {
                         "hookEventName": "UserPromptSubmit",
                         "additionalContext": (
-                            "【Codex 오프】 /codex-off 활성 상태입니다."
-                            " CCP 서브에이전트 없이 Claude가 직접 처리합니다."
-                            " 복구하려면 /codex-on을 실행하세요."
+                            "【모델 라우터 — CODEX 강제】"
+                            " 모든 작업을 ccp-gpt 에이전트로 위임하세요."
+                            " → 조회/탐색: `ccp-gpt-5-4-mini`,"
+                            " 코딩/분석: `ccp-gpt-5-4`,"
+                            " 리뷰/설계: `ccp-gpt-5-5`"
                         ),
                     }
                 },
@@ -186,19 +195,9 @@ def main() -> None:
         )
         return
 
-    hint = build_hint(tier, needs_context)
-
-    print(
-        json.dumps(
-            {
-                "hookSpecificOutput": {
-                    "hookEventName": "UserPromptSubmit",
-                    "additionalContext": hint,
-                }
-            },
-            ensure_ascii=False,
-        )
-    )
+    # Codex 모드 OFF: 아무 힌트도 주입하지 않음
+    # (native_flag /codex-off 처리도 힌트 없음으로 통일)
+    return
 
 
 if __name__ == "__main__":
