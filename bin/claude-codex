@@ -82,6 +82,12 @@ claude_extra_args+=(
   --disallowedTools "Task(codex-research),Task(codex-reader),Task(codex-coder),Task(codex-reviewer)"
 )
 
+# codex 모드 마커: 훅 서브프로세스가 env를 받지 못하므로 파일로 신호 전달
+CLAUDE_DIR="${HOME}/.claude"
+mkdir -p "$CLAUDE_DIR"
+_ccp_pending="${CLAUDE_DIR}/codex_mode_pending_$$"
+: > "$_ccp_pending"
+
 exec claude \
   --settings "$SETTINGS" \
   --model "$CODEX_MODEL" \

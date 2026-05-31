@@ -38,8 +38,19 @@ def find_state_path(session_id: str) -> Path | None:
 def is_codex_mode(session_id: str) -> bool:
     if (CLAUDE_DIR / f"codex_mode_on_{session_id}").exists():
         return True
-    # claude-codex 런처 감지: ANTHROPIC_BASE_URL이 localhost proxy를 가리키거나
-    # ANTHROPIC_MODEL이 GPT 계열인 경우
+    # claude-codex 런처 감지: 런처가 exec 직전에 codex_mode_pending_{PID} 파일을 생성함.
+    # Claude Code가 훅 서브프로세스에 ANTHROPIC_BASE_URL 등 env를 sanitize하므로
+    # env 체크 대신 pending 파일 감지 → codex_mode_on_{session_id} 파일로 변환(consume).
+    pending_files = sorted(CLAUDE_DIR.glob("codex_mode_pending_*"), key=lambda p: p.stat().st_mtime)
+    for pending in pending_files:
+        try:
+            pending.rename(CLAUDE_DIR / f"codex_mode_on_{session_id}")
+            return True
+        except OSError:
+            # 다른 훅 인스턴스가 먼저 소비했으면 이미 codex_mode_on 파일 생성됨
+            if (CLAUDE_DIR / f"codex_mode_on_{session_id}").exists():
+                return True
+    # env 체크 (직접 실행 환경 fallback — sanitize 전 컨텍스트용)
     base_url = os.environ.get("ANTHROPIC_BASE_URL", "")
     if base_url and ("localhost" in base_url or "127.0.0.1" in base_url):
         return True
