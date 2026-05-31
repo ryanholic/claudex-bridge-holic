@@ -36,6 +36,9 @@ def find_state_path(session_id: str) -> Path | None:
 
 
 def is_codex_mode(session_id: str) -> bool:
+    # /codex-off 명시적 OFF 신호 우선 확인 — pending 파일보다 강함
+    if (CLAUDE_DIR / f"codex_native_on_{session_id}").exists():
+        return False
     if (CLAUDE_DIR / f"codex_mode_on_{session_id}").exists():
         return True
     # claude-codex 런처 감지: 런처가 exec 직전에 codex_mode_pending_{PID} 파일을 생성함.
