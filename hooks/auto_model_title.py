@@ -36,7 +36,17 @@ def find_state_path(session_id: str) -> Path | None:
 
 
 def is_codex_mode(session_id: str) -> bool:
-    return (CLAUDE_DIR / f"codex_mode_on_{session_id}").exists()
+    if (CLAUDE_DIR / f"codex_mode_on_{session_id}").exists():
+        return True
+    # claude-codex 런처 감지: ANTHROPIC_BASE_URL이 localhost proxy를 가리키거나
+    # ANTHROPIC_MODEL이 GPT 계열인 경우
+    base_url = os.environ.get("ANTHROPIC_BASE_URL", "")
+    if base_url and ("localhost" in base_url or "127.0.0.1" in base_url):
+        return True
+    model = os.environ.get("ANTHROPIC_MODEL", "")
+    if model and model.startswith("gpt-"):
+        return True
+    return False
 
 
 def shorten_title(text: str, limit: int = MAX_TITLE_LEN) -> str:
@@ -148,7 +158,9 @@ def _spawn_summarizer(state_path: Path, raw_title: str, emoji: str) -> None:
         "try:\n"
         "    s = json.loads(sp.read_text())\n"
         "    if s.get('nameSource') == 'user': sys.exit(0)\n"
-        "    s['name'] = emoji + ' ' + title\n"
+        "    curr = (s.get('name') or '').strip()\n"
+        "    active_emoji = '⚡' if curr.startswith('⚡ ') else ('✨' if curr.startswith('✨ ') else emoji)\n"
+        "    s['name'] = active_emoji + ' ' + title\n"
         "    sp.write_text(json.dumps(s, ensure_ascii=False))\n"
         "except Exception: pass\n"
     )
