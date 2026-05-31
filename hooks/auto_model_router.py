@@ -17,7 +17,7 @@ _ADVISOR = re.compile(
 
 # heavy: 설계·복잡 추론·리뷰·보안
 _HEAVY = re.compile(
-    r"설계|아키텍처|architecture|(?:코드\s*)?리뷰|review|분석|analysis"
+    r"설계|아키텍처|architecture|(?:코드\s*)?리뷰|review|검토|분석|analysis"
     r"|전략|strategy|최적화|optim|refactor|리팩터|보안|security|audit|취약"
     r"|prd|복잡|complex|tradeoff|트레이드|pros.*cons|프로.*콘스",
     re.I,
@@ -133,7 +133,6 @@ def build_hint(tier: str, needs_context: bool) -> str:
         "【모델 라우터 — light】"
         " 간단한 조회·질문입니다."
         " → `ccp-gpt-5-4-mini` 서브에이전트를 호출하세요."
-        " 단순 파일 읽기라면 직접 Read 도구가 더 빠릅니다."
     )
 
 
@@ -157,7 +156,14 @@ def main() -> None:
 
     tier, needs_context = classify(prompt)
 
+    # PreToolUse hook이 tier를 읽을 수 있도록 세션별 상태 파일 기록
     session_id = ctx.get("session_id", "unknown")
+    try:
+        with open(f"/tmp/claude_tier_{session_id}.json", "w") as _f:
+            import json as _json
+            _json.dump({"tier": tier, "needs_context": needs_context}, _f)
+    except OSError:
+        pass
 
     # /codex-off 명시 시: CCP 힌트 대신 "Claude 직접 처리" 힌트로 교체
     from pathlib import Path as _Path
