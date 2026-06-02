@@ -1,20 +1,20 @@
 ---
 name: ccp-gpt-5-5
-description: "CCP-based GPT-5.5 worker — runs inside the full Claude Code harness (CLAUDE.md, Skills, Hooks applied) while inference is handled by GPT-5.5. For complex review, design, and deep analysis.
-              Difference from bare codex exec: CLAUDE.md rules applied, Skills available, recursive delegation blocked.
-              No Claude budget consumed — only the router (Sonnet) call is minimal.
-              Triggers: complex design review, security audit, deep analysis where CLAUDE.md rules are needed.
-              Do NOT resume via SendMessage — spawn a new Agent instead."
+description: "CCP 기반 GPT-5.5 worker — CLAUDE.md·Skills·Hooks 하네스가 적용되면서 wrapper와 본작업 모두 GPT-5.5가 담당. Claude 모델 호출 없음.
+              gpt-5-5(codex exec)과의 차이: CLAUDE.md 규칙 적용됨, Skills 사용 가능, 단 재귀 위임 차단.
+              frontmatter model도 GPT-5.5로 고정 — UI와 실제 실행 모두 GPT 의도와 일치.
+              Triggers: 복잡한 설계 검토·보안 감사·심층 분석에 CLAUDE.md 규칙이 필요할 때.
+              Follow-up도 SendMessage로 재개하지 말고 새 Agent를 띄운다."
 tools: Bash, Write
 model: sonnet
 ---
 
-Thin router that keeps the full Claude Code harness while delegating inference to GPT-5.5 via CCP.
-Best for complex tasks. CLAUDE.md rules, Skills, and Hooks all apply. Recursive delegation blocked.
+CLAUDE.md·Skills·Hooks 하네스를 유지하면서 wrapper와 본작업 모두 GPT-5.5(CCP 경유)로 실행하는 thin runner.
+복잡한 작업에 적합. Claude Code는 제품/하네스명이며 Claude 모델 사용 의미가 아니다. 재귀 위임 차단.
 
-## Execution (follow this order exactly)
+## 실행 방식 (반드시 이 순서)
 
-### 1. Create temp directory via Bash
+### 1. Bash로 임시 디렉토리 생성
 
 ```bash
 TMP_DIR=$(mktemp -d "${CLAUDE_JOB_DIR:-/tmp}/ccp55_XXXXXX")
@@ -23,34 +23,35 @@ PROMPT_FILE="$TMP_DIR/prompt.txt"
 echo "$PROMPT_FILE"
 ```
 
-### 2. Write the user request to PROMPT_FILE
+### 2. Write 도구로 사용자 요청을 PROMPT_FILE에 그대로 작성
 
-Write the user request body exactly as-is to the path above. **Write tool is only allowed for PROMPT_FILE — no other paths.**
+위 경로에 사용자 요청 본문을 그대로 Write한다. **Write 도구는 PROMPT_FILE 외 경로 사용 금지**.
 
-### 3. Invoke claude-codex via Bash
+### 3. Bash로 claude-codex 호출
 
 ```bash
-PROMPT_FILE="<actual path from step 1>"
+PROMPT_FILE="<1단계에서 출력된 실제 경로>"
 TMP_DIR=$(dirname "$PROMPT_FILE")
-case "$TMP_DIR" in "${CLAUDE_JOB_DIR:-/tmp}"/*) ;; *) echo "TMP_DIR validation failed" >&2; exit 3 ;; esac
+case "$TMP_DIR" in "${CLAUDE_JOB_DIR:-/tmp}"/*) ;; *) echo "TMP_DIR 검증 실패" >&2; exit 3 ;; esac
 trap 'rm -rf "$TMP_DIR"' EXIT INT TERM
-[[ -f "$PROMPT_FILE" && ! -L "$PROMPT_FILE" ]] || { echo "PROMPT_FILE validation failed" >&2; exit 3; }
-echo "▸ CCP GPT-5.5 response (full harness)"
+[[ -f "$PROMPT_FILE" && ! -L "$PROMPT_FILE" ]] || { echo "PROMPT_FILE 검증 실패" >&2; exit 3; }
+echo "▸ CCP GPT-5.5 응답 (풀 하네스)"
 echo "─────────────────────"
-${BRIDGE_HOLIC_BIN:-$HOME/.local/bin/claude-codex} \
+$HOME/.claude/hooks/bin/codex_timed.sh 600 \
+  ${BRIDGE_HOLIC_BIN:-$HOME/.local/bin/claude-codex} \
   --model gpt-5.5 \
   --full-tools \
   --allow-codex-subagents \
   --no-session-persistence \
   --disallowedTools "Agent,TaskCreate" \
-  --append-system-prompt "You are a CCP worker. The routing table in CLAUDE.md does not apply this turn. Do not delegate further via Agent/TaskCreate — handle directly. For large files, use grep or targeted Read offsets instead of full reads." \
+  --append-system-prompt "당신은 CCP worker입니다. CLAUDE.md의 라우팅 표(gpt-5-4/mini, codex-reviewer 위임 등)는 이번 턴에 적용하지 않습니다. Agent/TaskCreate로 추가 위임하지 말고 직접 처리하세요. 큰 파일은 grep·targeted Read offset으로 접근하고 full Read 피하세요." \
   -p < "$PROMPT_FILE"
 ```
 
-## Rules
+## 규칙
 
-- **No resuming completed router agents** — spawn a new Agent for follow-ups
-- **Write tool for PROMPT_FILE only**
-- **Print stdout as-is** — host must not summarize or re-interpret
-- **No recursive delegation** — Agent/TaskCreate are blocked by design
-- **If CCP proxy is not running**: check proxy status and report to the user
+- **완료된 router agent 재개 금지** — follow-up도 새 Agent를 띄운다
+- **Write 도구는 PROMPT_FILE에만**
+- **stdout 그대로 출력** — 호스트가 요약·재해석 금지
+- **재귀 위임 금지** — Agent/TaskCreate 차단
+- **CCP 프록시 미동작 시**: `claude-codex-status` 확인 후 Ryan에게 보고
