@@ -8,6 +8,7 @@ if os.path.exists(os.path.expanduser("~/.claude/router_enforcer.off")):
     sys.exit(0)
 
 PASS_THROUGH = {"Read", "Glob", "Grep"}
+BLOCKABLE = {"Edit", "Write"}
 AGENT_MAP = {"medium": "ccp-gpt-5-4", "heavy": "ccp-gpt-5-5"}
 
 _TIER_BLOCK = {
@@ -16,19 +17,16 @@ _TIER_BLOCK = {
 }
 
 
-def block(tool_name, tier, payload):
+def hint(tool_name, tier, payload):
     suggested = "ccp-gpt-5-4" if tool_name in ("Edit", "Write") else AGENT_MAP.get(tier, "ccp-gpt-5-4")
-    reason = (
-        f"[router-enforcer] {tool_name} 직접 실행 차단 (tier={tier}). "
-        f"-> Agent(subagent_type=\"{suggested}\", prompt=\"...\") 로 위임하세요."
+    msg = (
+        f"[router-hint] {tool_name} 직접 실행 중 (tier={tier}). "
+        f"무거운 작업이면 Agent(subagent_type=\"{suggested}\")로 위임을 고려하세요. (강제 아님 — 실행은 허용됨)"
     )
     print(json.dumps({
-        "decision": "block",
-        "reason": reason,
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
-            "permissionDecision": "deny",
-            "permissionDecisionReason": reason,
+            "additionalContext": msg,
         },
     }, ensure_ascii=False))
 
@@ -39,7 +37,6 @@ def main():
     except Exception:
         return 0
 
-    # agent_id check is the real guard; agent_type check is defensive dead code
     if payload.get("agent_id") or payload.get("agent_type", "claude") != "claude":
         return 0
 
@@ -52,9 +49,6 @@ def main():
     if os.path.exists(native_flag):
         return 0
 
-    # Tier file is written by an external hook/command that classifies task complexity.
-    # If it doesn't exist (default for most setups), this hook passes through all tools.
-    # "medium" -> blocks Edit/Write;  "heavy" -> blocks Edit/Write/Bash
     try:
         with open(f"/tmp/claude_tier_{session_id}.json") as f:
             state = json.load(f)
@@ -65,7 +59,7 @@ def main():
     if tool_name not in _TIER_BLOCK.get(tier, set()):
         return 0
 
-    block(tool_name, tier, payload)
+    hint(tool_name, tier, payload)
     return 0
 
 

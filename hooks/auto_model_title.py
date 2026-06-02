@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""UserPromptSubmit hook: 세션 제목 앞에 현재 모델명 prefix 자동 추가 (state.json 직접 패치)."""
+"""UserPromptSubmit hook: 세션 제목 auto prefix 최초 1회만 추가 (state.json 직접 패치)."""
 
 import json
 import os
@@ -13,7 +13,8 @@ JOBS_DIR = HOME / ".claude" / "jobs"
 MAX_TITLE_LEN = 20
 
 CLAUDE_DIR = HOME / ".claude"
-MODE_EMOJIS = ("⚡ ", "✨ ")
+MODE_EMOJIS = ("🤖 ", "🧠 ", "⚡ ", "🔆 ")  # 4상태 prefix (이미 붙었나 체크용)
+STRIP_EMOJIS = MODE_EMOJIS + ("✨ ",)  # 레거시 포함 strip용
 
 
 def find_state_path(session_id: str) -> Path | None:
@@ -35,32 +36,25 @@ def find_state_path(session_id: str) -> Path | None:
     return None
 
 
+def is_codex_launcher(state: dict) -> bool:
+    flags = json.dumps(state.get("respawnFlags", []))
+    return "ANTHROPIC_BASE_URL" in flags or "gpt-5" in flags
+
+
 def is_codex_mode(session_id: str) -> bool:
-    # /codex-off 명시적 OFF 신호 우선 확인 — pending 파일보다 강함
+    # 강제 위임 모드는 /codex-on 명령으로 만든 세션별 플래그가 있을 때만 ON.
+    # claude-codex 자체는 기본 OFF로 시작한다.
     if (CLAUDE_DIR / f"codex_native_on_{session_id}").exists():
         return False
     if (CLAUDE_DIR / f"codex_mode_on_{session_id}").exists():
         return True
-    # claude-codex 런처 감지: 런처가 exec 직전에 codex_mode_pending_{PID} 파일을 생성함.
-    # Claude Code가 훅 서브프로세스에 ANTHROPIC_BASE_URL 등 env를 sanitize하므로
-    # env 체크 대신 pending 파일 감지 → codex_mode_on_{session_id} 파일로 변환(consume).
-    pending_files = sorted(CLAUDE_DIR.glob("codex_mode_pending_*"), key=lambda p: p.stat().st_mtime)
-    for pending in pending_files:
-        try:
-            pending.rename(CLAUDE_DIR / f"codex_mode_on_{session_id}")
-            return True
-        except OSError:
-            # 다른 훅 인스턴스가 먼저 소비했으면 이미 codex_mode_on 파일 생성됨
-            if (CLAUDE_DIR / f"codex_mode_on_{session_id}").exists():
-                return True
-    # env 체크 (직접 실행 환경 fallback — sanitize 전 컨텍스트용)
-    base_url = os.environ.get("ANTHROPIC_BASE_URL", "")
-    if base_url and ("localhost" in base_url or "127.0.0.1" in base_url):
-        return True
-    model = os.environ.get("ANTHROPIC_MODEL", "")
-    if model and model.startswith("gpt-"):
-        return True
     return False
+
+
+def pick_emoji(launcher: bool, codex_on: bool) -> str:
+    if not launcher:
+        return "🤖" if codex_on else "🧠"
+    return "🔆" if codex_on else "⚡"
 
 
 def shorten_title(text: str, limit: int = MAX_TITLE_LEN) -> str:
@@ -173,7 +167,7 @@ def _spawn_summarizer(state_path: Path, raw_title: str, emoji: str) -> None:
         "    s = json.loads(sp.read_text())\n"
         "    if s.get('nameSource') == 'user': sys.exit(0)\n"
         "    curr = (s.get('name') or '').strip()\n"
-        "    active_emoji = '⚡' if curr.startswith('⚡ ') else ('✨' if curr.startswith('✨ ') else emoji)\n"
+        "    active_emoji = next((e for e in ('🤖','🧠','⚡','🔆') if curr.startswith(e+' ')), emoji)\n"
         "    s['name'] = active_emoji + ' ' + title\n"
         "    sp.write_text(json.dumps(s, ensure_ascii=False))\n"
         "except Exception: pass\n"
@@ -237,19 +231,29 @@ def main():
     current_name = (state.get("name") or "").strip()
     name_source = state.get("nameSource")
 
+    # 자동 기본값 설정: 플래그 둘 다 없으면 런처 기반 기본값 생성
+    mode_flag = CLAUDE_DIR / f"codex_mode_on_{session_id}"
+    native_flag = CLAUDE_DIR / f"codex_native_on_{session_id}"
+    if not mode_flag.exists() and not native_flag.exists():
+        if is_codex_launcher(state):
+            native_flag.touch()   # claude-codex → 기본 OFF
+        else:
+            mode_flag.touch()     # 네이티브 claude → 기본 ON
+
     if name_source == "user":
         sys.exit(0)
-
-    emoji = "⚡" if is_codex_mode(session_id) else "✨"
-    if current_name.startswith(f"{emoji} "):
+    if current_name.startswith(MODE_EMOJIS):
         sys.exit(0)
+
+
+    emoji = pick_emoji(is_codex_launcher(state), is_codex_mode(session_id))
 
     was_first = not state.get("nameSource")
     raw_intent = (state.get("intent") or "").strip().splitlines()[0].strip()
 
     respawn_flags = state.get("respawnFlags", [])
     base_name = pick_base_name(state, respawn_flags)
-    for pfx in MODE_EMOJIS:
+    for pfx in STRIP_EMOJIS:
         if base_name.startswith(pfx):
             base_name = base_name[len(pfx):]
             break

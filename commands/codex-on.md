@@ -6,7 +6,7 @@
 
 ```bash
 python3 - <<"PYEOF"
-import json, os
+import json, os, re
 from pathlib import Path
 sid = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
 if not sid: raise SystemExit(0)
@@ -22,16 +22,19 @@ if not state_path: raise SystemExit(0)
 state = json.loads(state_path.read_text())
 if state.get("nameSource") == "user": raise SystemExit(0)
 name = (state.get("name") or "").strip()
-for pfx in ("⚡ ", "✨ "):
+for pfx in ("🤖 ", "🧠 ", "⚡ ", "🔆 ", "✨ "):
     if name.startswith(pfx): name = name[len(pfx):]; break
-import re; name = re.sub(r"^\[[^\]]+\]\s*", "", name)
-state["name"] = "⚡ " + name
+name = re.sub(r"^\[[^\]]+\]\s*", "", name)
+flags = json.dumps(state.get("respawnFlags", []))
+is_codex_launcher = "ANTHROPIC_BASE_URL" in flags or "gpt-5" in flags
+new_emoji = "🔆" if is_codex_launcher else "🤖"
+state["name"] = new_emoji + " " + name
 state_path.write_text(json.dumps(state, ensure_ascii=False))
 print(f"세션 제목 → {state['name']}")
 PYEOF
 ```
 
-이 세션에서 **Codex 강제 위임 모드**를 활성화한다.
+이 세션에서만 **Codex 강제 위임 모드**를 활성화한다. 새 claude-codex 세션은 기본 OFF 상태로 시작한다.
 
 ## 의무 위임 (직접 처리 금지)
 

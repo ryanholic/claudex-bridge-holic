@@ -6,7 +6,7 @@
 
 ```bash
 python3 - <<"PYEOF"
-import json, os
+import json, os, re
 from pathlib import Path
 sid = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
 if not sid: raise SystemExit(0)
@@ -22,10 +22,13 @@ if not state_path: raise SystemExit(0)
 state = json.loads(state_path.read_text())
 if state.get("nameSource") == "user": raise SystemExit(0)
 name = (state.get("name") or "").strip()
-for pfx in ("⚡ ", "✨ "):
+for pfx in ("🤖 ", "🧠 ", "⚡ ", "🔆 ", "✨ "):
     if name.startswith(pfx): name = name[len(pfx):]; break
-import re; name = re.sub(r"^\[[^\]]+\]\s*", "", name)
-state["name"] = "✨ " + name
+name = re.sub(r"^\[[^\]]+\]\s*", "", name)
+flags = json.dumps(state.get("respawnFlags", []))
+is_codex_launcher = "ANTHROPIC_BASE_URL" in flags or "gpt-5" in flags
+new_emoji = "⚡" if is_codex_launcher else "🧠"
+state["name"] = new_emoji + " " + name
 state_path.write_text(json.dumps(state, ensure_ascii=False))
 print(f"세션 제목 → {state['name']}")
 PYEOF
@@ -33,9 +36,9 @@ PYEOF
 
 **Codex 강제 위임 모드를 해제한다.**
 
-이제부터 이 세션에서는 CCP 서브에이전트 없이 Claude가 직접 처리한다.
-라우터 힌트도 "Codex 오프 — Claude 직접 처리"로 교체된다.
+이제부터 이 세션에서는 CCP 서브에이전트 강제 위임 없이 현재 메인 모델이 직접 처리한다.
+라우터 힌트와 도구 차단도 꺼진다.
 
 복구: `/codex-on`
 
-**Codex 모드 OFF.**
+**Codex 강제 위임 모드 OFF.**
