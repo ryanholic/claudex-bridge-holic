@@ -130,6 +130,36 @@ for f in "$REPO_DIR"/commands/codex-*.md; do
   ok "Command: /$(basename "$name" .md)"
 done
 
+# ─── step 7: codex MCP worker (공식 codex mcp-server 위임 경로 — 1순위) ──────────
+echo ""
+echo -e "${BOLD}Step 7: codex MCP worker${NC}"
+CODEX_BIN="$(command -v codex || true)"
+if [[ -n "$CODEX_BIN" ]]; then
+  WORKER_HOME="$HOME/.codex-worker"
+  mkdir -p "$WORKER_HOME"; chmod 700 "$WORKER_HOME"
+  # auth 복사 (인터랙티브 codex home에서)
+  [[ -f "$HOME/.codex/auth.json" ]] && cp "$HOME/.codex/auth.json" "$WORKER_HOME/auth.json"
+  [[ -f "$HOME/.codex/.credentials.json" ]] && cp "$HOME/.codex/.credentials.json" "$WORKER_HOME/.credentials.json"
+  # 최소 config — mcp_servers/plugins 없음(20분 행업 #24397 회피)
+  cat > "$WORKER_HOME/config.toml" <<'TOML'
+# Codex worker home — Claude Code가 codex mcp-server로 위임할 때 사용.
+model = "gpt-5.4"
+approval_policy = "never"
+sandbox_mode = "workspace-write"
+TOML
+  # 워커가 프로젝트 규칙 상속 (한국어·KST·배포 push만 등)
+  ln -sf "$HOME/.claude/CLAUDE.md" "$WORKER_HOME/AGENTS.md"
+  # user scope로 codex MCP 등록 (mcp__codex__codex 도구 노출)
+  claude mcp add -s user codex --env CODEX_HOME="$WORKER_HOME" -- "$CODEX_BIN" mcp-server >/dev/null 2>&1 \
+    && ok "codex MCP 등록 (user scope, CODEX_HOME=$WORKER_HOME)" \
+    || info "codex MCP 이미 등록됐거나 등록 실패 — claude mcp list 확인"
+  # NOTE: γ 가드(거짓Done 검증)를 codex MCP에도 적용하려면 settings.json hooks에
+  #   PreToolUse/PostToolUse "mcp__codex__codex" matcher → gamma_delegation_guard.py 등록 필요
+  #   (install.sh는 settings.json hook 등록을 관리하지 않음 — 기존 훅과 동일).
+else
+  info "codex CLI 미설치 — codex MCP worker 건너뜀 (npm i -g @openai/codex 또는 brew install codex)"
+fi
+
 # ─── self-test ────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}Self-test${NC}"

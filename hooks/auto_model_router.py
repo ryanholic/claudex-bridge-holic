@@ -182,11 +182,12 @@ def main() -> None:
                     "hookSpecificOutput": {
                         "hookEventName": "UserPromptSubmit",
                         "additionalContext": (
-                            "【모델 라우터 — CODEX 강제】"
-                            " 모든 작업을 ccp-gpt 에이전트로 위임하세요."
-                            " → 조회/탐색: `ccp-gpt-5-4-mini`,"
-                            " 코딩/분석: `ccp-gpt-5-4`,"
-                            " 리뷰/설계: `ccp-gpt-5-5`"
+                            "【모델 라우터 — CODEX 위임】"
+                            " 실작업(물량)은 `mcp__codex__codex` 도구로 위임 (approval-policy=\"never\", cwd=대상repo)."
+                            " → 조회/탐색: model=\"gpt-5.4-mini\" sandbox=\"read-only\","
+                            " 코딩/구현/분석: model=\"gpt-5.4\" sandbox=\"workspace-write\","
+                            " 리뷰/설계/보안: model=\"gpt-5.5\" sandbox=\"read-only\"."
+                            " 판단·검수·대화는 Claude 유지. MCP 미동작 시 fallback=ccp-gpt 서브에이전트."
                         ),
                     }
                 },

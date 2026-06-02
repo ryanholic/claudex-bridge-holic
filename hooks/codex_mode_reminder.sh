@@ -9,12 +9,14 @@ fi
 
 if [ -f "$HOME/.claude/codex_mode_on_${session_id}" ]; then
   cat <<'EOF'
-🔴 CODEX 강제 위임 모드 ON (이 세션에서 /codex-on 으로 활성화됨):
-- 웹 리서치 / 라이브러리 조사 / 외부 정보 / 최신 동향 → ccp-gpt-5-4-mini 서브에이전트
-- 500줄 이상 파일 읽기 / 낯선 디렉토리 탐색 → ccp-gpt-5-4 서브에이전트
-- 30줄 이상 코드 신규 작성 / 기능 구현 / 스크립트 생성 → ccp-gpt-5-4 서브에이전트
-- 코드 리뷰 / 적대적 검토 → ccp-gpt-5-5 서브에이전트
-직접 처리 금지. 위임 결과가 불충분해도 직접 처리로 대체하지 않는다.
+🔴 CODEX 위임 모드 ON (/codex-on). 실작업(물량)은 codex MCP 도구로 위임 → Claude 버킷 절약.
+호출: mcp__codex__codex(prompt, model, sandbox, approval-policy="never", cwd="<대상 repo 절대경로>")
+- 조회/리서치/탐색      → model="gpt-5.4-mini", sandbox="read-only"
+- 코딩/구현/수정/분석   → model="gpt-5.4",      sandbox="workspace-write"
+- 리뷰/설계/보안감사    → model="gpt-5.5",      sandbox="read-only"
+codex가 결과 텍스트를 직접 반환. 산출물(파일)은 mtime·git diff로 직접 검증 후에만 완료 처리.
+판단·계획·검수·Ryan 커뮤니케이션은 Claude가 직접 유지(순수 라우터화 금지 — 거짓 완료를 잡는 주체).
+MCP 미동작 시 fallback: Agent(subagent_type="ccp-gpt-5-4"/"ccp-gpt-5-4-mini"/"ccp-gpt-5-5").
 해제: /codex-off
 EOF
 fi
