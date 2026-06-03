@@ -174,21 +174,36 @@ def main() -> None:
     codex_mode_flag = _Path.home() / f".claude/codex_mode_on_{codex_mode_session}"
 
     if codex_mode_flag.exists():
-        # Codex 모드 ON: tier 무관하게 강제 위임 힌트 주입
-        # (codex_mode_reminder.sh가 이미 상세 메시지를 출력하므로 여기서는 짧게)
+        if tier == "heavy":
+            additional_context = (
+                "【모델 라우터 — CODEX 강제 위임 🔴 heavy】"
+                " 이 작업은 반드시 `mcp__codex__codex(model=\"gpt-5.5\", sandbox=\"read-only\", approval-policy=\"never\", cwd=<대상repo>)` 로 위임하세요."
+                " Claude가 직접 Read/Bash로 처리하는 것은 규칙 위반입니다."
+                " 탐색이 필요하면 먼저 Read/Grep → 결과를 prompt에 담아 codex gpt-5.5 위임 → Claude는 결과 검수만 수행."
+            )
+        elif tier == "medium":
+            additional_context = (
+                "【모델 라우터 — CODEX 위임 🟡 medium】"
+                " 코딩/구현/수정 작업입니다."
+                " `mcp__codex__codex(model=\"gpt-5.4\", sandbox=\"workspace-write\", approval-policy=\"never\", cwd=<대상repo>)` 로 위임하세요."
+                " 직접 처리 금지."
+            )
+        else:
+            additional_context = (
+                "【모델 라우터 — CODEX 위임】"
+                " 실작업(물량)은 `mcp__codex__codex` 도구로 위임 (approval-policy=\"never\", cwd=대상repo)."
+                " → 조회/탐색: model=\"gpt-5.4-mini\" sandbox=\"read-only\","
+                " 코딩/구현/분석: model=\"gpt-5.4\" sandbox=\"workspace-write\","
+                " 리뷰/설계/보안: model=\"gpt-5.5\" sandbox=\"read-only\"."
+                " 판단·검수·대화는 Claude 유지. MCP 미동작 시 fallback=ccp-gpt 서브에이전트."
+            )
+
         print(
             json.dumps(
                 {
                     "hookSpecificOutput": {
                         "hookEventName": "UserPromptSubmit",
-                        "additionalContext": (
-                            "【모델 라우터 — CODEX 위임】"
-                            " 실작업(물량)은 `mcp__codex__codex` 도구로 위임 (approval-policy=\"never\", cwd=대상repo)."
-                            " → 조회/탐색: model=\"gpt-5.4-mini\" sandbox=\"read-only\","
-                            " 코딩/구현/분석: model=\"gpt-5.4\" sandbox=\"workspace-write\","
-                            " 리뷰/설계/보안: model=\"gpt-5.5\" sandbox=\"read-only\"."
-                            " 판단·검수·대화는 Claude 유지. MCP 미동작 시 fallback=ccp-gpt 서브에이전트."
-                        ),
+                        "additionalContext": additional_context,
                     }
                 },
                 ensure_ascii=False,
