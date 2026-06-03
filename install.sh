@@ -147,8 +147,10 @@ model = "gpt-5.4"
 approval_policy = "never"
 sandbox_mode = "workspace-write"
 TOML
-  # 워커가 프로젝트 규칙 상속 (한국어·KST·배포 push만 등)
-  ln -sf "$HOME/.claude/CLAUDE.md" "$WORKER_HOME/AGENTS.md"
+  # 워커가 공통 규칙 상속 (shared-core.md: 오케스트레이션 메타 제외 슬림)
+  mkdir -p "$HOME/.claude/rules"
+  [[ -f "$REPO_DIR/rules/shared-core.md" ]] && cp "$REPO_DIR/rules/shared-core.md" "$HOME/.claude/rules/shared-core.md"
+  ln -sf "$HOME/.claude/rules/shared-core.md" "$WORKER_HOME/AGENTS.md"
   # user scope로 codex MCP 등록 (mcp__codex__codex 도구 노출)
   claude mcp add -s user codex --env CODEX_HOME="$WORKER_HOME" -- "$CODEX_BIN" mcp-server >/dev/null 2>&1 \
     && ok "codex MCP 등록 (user scope, CODEX_HOME=$WORKER_HOME)" \

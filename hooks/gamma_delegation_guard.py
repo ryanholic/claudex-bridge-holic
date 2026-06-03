@@ -24,6 +24,7 @@ if os.path.exists(os.path.expanduser("~/.claude/gamma_guard.off")):
 
 DEDUP_WINDOW = 600  # 초. 동일 위임이 이 안에 재호출되면 경고.
 CODEX_MCP_TOOL = "mcp__codex__codex"
+MCP_NAMESPACE_PATTERN = "mcp__"
 
 # 쓰기·완료 주장 (과거형 동사). 읽기작업("조회/확인 완료")은 매칭 안 되게 일반 "완료" 제외.
 WRITE_CLAIM = (
@@ -52,6 +53,21 @@ def worker_identity(tool_name: str, tool_input: dict):
     return False, "", ""
 
 
+def pre_mcp_preflight(label: str, prompt: str) -> None:
+    """codex 프롬프트에 mcp__ 네임스페이스 패턴 감지 시 경고."""
+    if MCP_NAMESPACE_PATTERN not in prompt:
+        return
+    import re
+    matches = re.findall(r'mcp__[a-zA-Z0-9_]+', prompt)
+    unique = list(dict.fromkeys(matches))[:3]
+    emit(
+        "PreToolUse",
+        f"[γ-mcp-preflight] codex 프롬프트에 MCP 도구 네임스페이스({', '.join(unique)}) 감지. "
+        f"codex worker MCP hang 위험(확인된 사고: 2931초). "
+        f"Claude가 직접 MCP 호출 후 결과를 codex 프롬프트에 포함하도록 수정 권장. (강제 아님)",
+    )
+
+
 def pre_dedup(session_id: str, key_material: str, label: str) -> None:
     key = hashlib.sha256(key_material.encode("utf-8", "replace")).hexdigest()[:16]
     path = f"/tmp/claude_gamma_calls_{session_id}.json"
@@ -76,6 +92,23 @@ def pre_dedup(session_id: str, key_material: str, label: str) -> None:
             f"[γ-dedup] 동일 위임({label}, 동일 프롬프트)이 {ago}초 전 실행됐습니다. "
             f"이전 결과를 재사용할 수 있으면 이 호출을 생략하세요. 의도된 재시도면 그대로 진행. (강제 아님)",
         )
+
+
+def log_delegation(session_id: str, label: str, tool_input: dict) -> None:
+    prompt = str(tool_input.get("prompt", ""))
+    record = {
+        "ts": time.time(),
+        "session_id": session_id,
+        "label": label,
+        "model": str(tool_input.get("model", "")),
+        "cwd": str(tool_input.get("cwd", "")),
+        "prompt_head": prompt[:100],
+    }
+    try:
+        with open(os.path.expanduser("~/.claude/codex_delegation_log.jsonl"), "a") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
 
 
 def post_verify(label: str, tool_response) -> None:
@@ -108,6 +141,9 @@ def main() -> int:
     session_id = payload.get("session_id", "unknown")
     try:
         if event == "PreToolUse":
+            if tool_name == CODEX_MCP_TOOL:
+                pre_mcp_preflight(label, str(tool_input.get("prompt", "")))
+            log_delegation(session_id, label, tool_input)
             pre_dedup(session_id, key_material, label)
         elif event == "PostToolUse":
             post_verify(label, payload.get("tool_response", payload.get("tool_result", "")))
