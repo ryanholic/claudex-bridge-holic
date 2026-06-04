@@ -12,6 +12,6 @@ exec env -i \
   CLAUDE_JOB_DIR="${CLAUDE_JOB_DIR:-}" \
   CLAUDE_OPUS_DIRECT_ACTIVE="${CLAUDE_OPUS_DIRECT_ACTIVE:-1}" \
   /Users/ryan_mini/.local/bin/claude \
-    --model claude-opus-4-8 \
+    --model opus \
     --no-session-persistence \
     -p "$@"

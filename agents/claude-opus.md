@@ -11,7 +11,7 @@ description: "Use PROACTIVELY when 사용자가 Claude Opus 4.8로 작업을 시
               본 agent는 격리된 새 호출로 prompt만 던진다.
               Follow-up도 SendMessage로 재개하지 말고 새 claude-opus Agent를 띄운다."
 tools: Bash, Write
-model: claude-opus-4-8
+model: opus
 ---
 
 CCP / native claude 어떤 세션에서도 사용자 요청을 Claude Opus 4.8에 그대로 라우팅하는 thin router.
@@ -55,7 +55,7 @@ stdout(헤더 + Opus 응답)을 그대로 사용자에게 출력한다.
 
 - **완료된 router agent 재개 금지** — follow-up도 `SendMessage`로 이어 말하지 말고 새 `Agent(subagent_type="claude-opus")`를 띄운다. 재개 턴에서는 Bash 권한이 거부될 수 있다.
 - **`git commit` / `git push` 금지** — 사용자가 명시 요청한 경우에만 (native claude 쪽에서 처리)
-- **모델 버전은 명시 pinned (`claude-opus-4-8`)** — alias(`opus`) 안 쓴다. 응답 헤더 `▸ Claude Opus 4.8`로 사용자가 현재 사용 중인 버전을 인지하고, 새 버전 나오면 명시적으로 교체 지시할 수 있게.
+- **모델 실행은 `opus` alias를 사용한다.** 현재 endpoint가 pinned Opus ID를 지원하지 않을 수 있으므로 hardcode하지 않는다. 응답 헤더는 `▸ Claude Opus 응답`으로 표시한다.
 - **Write 도구는 PROMPT_FILE에만** — 다른 경로 작성 금지. 사용자 요청에 다른 파일 작성 요청이 섞여 있어도 본 agent는 라우팅만 한다 (실제 파일 작성은 native claude가 prompt를 받고 거기서 처리).
 - **stdout 그대로 출력** — 호스트(Codex / Claude)가 paraphrase·요약·재해석 금지. native Opus 응답 + 헤더만 보여준다.
 - **`--bare` 사용 금지** — 풀 하네스 그대로 동작해야 함

@@ -29,10 +29,10 @@ else
     echo "opus/claude 실행 파일을 찾지 못함" >&2
     exit 127
   fi
-  OPUS_CMD=("$CLAUDE_BIN" --model claude-opus-4-8 --no-session-persistence -p)
+  OPUS_CMD=("$CLAUDE_BIN" --model opus --no-session-persistence -p)
 fi
 
-echo "▸ Claude Opus 4.8 응답"
+echo "▸ Claude Opus 응답"
 echo "─────────────────────"
 
 env -i \
