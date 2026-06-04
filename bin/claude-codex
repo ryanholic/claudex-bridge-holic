@@ -22,8 +22,48 @@ PROXY_PORT="${CLAUDE_CODE_PROXY_PORT:-18765}"
 PROXY_URL="http://127.0.0.1:${PROXY_PORT}"
 CODEX_MODEL="${CLAUDE_CODE_PROXY_MODEL:-gpt-5.4}"
 CODEX_SMALL="${CLAUDE_CODE_PROXY_SMALL:-gpt-5.4-mini}"
+CODEX_TMPDIR="${CLAUDE_CODE_PROXY_TMPDIR:-/tmp/claude-codex-$(id -u)-${PROXY_PORT}-${CODEX_MODEL}}"
 TOOL_MODE="light"
 LIGHT_TOOLS="Bash,Read,Edit,Write"
+
+prepare_claude_tmpdir() {
+  local dir="$1" owner uid mode acl_mode
+  uid="$(id -u)"
+  case "$dir" in
+    *[[:space:]]*)
+      echo "ERROR: refusing tmpdir path with whitespace: $dir" >&2
+      exit 1
+      ;;
+  esac
+  if [[ -L "$dir" ]]; then
+    echo "ERROR: refusing symlink tmpdir: $dir" >&2
+    exit 1
+  fi
+  if [[ ! -d "$dir" ]]; then
+    mkdir -m 700 -p "$dir"
+  fi
+  if [[ -L "$dir" ]]; then
+    echo "ERROR: refusing symlink tmpdir after mkdir: $dir" >&2
+    exit 1
+  fi
+  owner="$(stat -f %u "$dir" 2>/dev/null || true)"
+  if [[ "$owner" != "$uid" ]]; then
+    echo "ERROR: tmpdir owner mismatch: $dir owner=$owner expected=$uid" >&2
+    exit 1
+  fi
+  mode="$(stat -f %Lp "$dir" 2>/dev/null || true)"
+  if [[ "$mode" != "700" ]]; then
+    echo "ERROR: insecure tmpdir mode: $dir mode=$mode expected=700; remove it and retry" >&2
+    exit 1
+  fi
+  acl_mode="$(ls -lde "$dir" 2>/dev/null | awk '{print $1}' || true)"
+  if [[ "$acl_mode" == *+* ]]; then
+    echo "ERROR: refusing tmpdir with ACL: $dir" >&2
+    exit 1
+  fi
+}
+
+prepare_claude_tmpdir "$CODEX_TMPDIR"
 
 claude_extra_args=()
 passthrough_args=()
@@ -84,7 +124,7 @@ claude_extra_args+=(
 
 # claude-codex 세션은 Codex 강제 위임 OFF로 시작한다.
 # 강제 위임은 /codex-on 명령이 세션별 codex_mode_on 파일을 만들 때만 켜진다.
-exec claude \
+exec env CLAUDE_CODE_TMPDIR="$CODEX_TMPDIR" claude \
   --settings "$SETTINGS" \
   --model "$CODEX_MODEL" \
   "${claude_extra_args[@]}" \
