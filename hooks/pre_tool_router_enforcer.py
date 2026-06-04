@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
+import re
 import shlex
 import sys
 
@@ -45,6 +46,33 @@ _ALLOWED_BASH_FORMS = (
     ("python", "-m", "json.tool"),
 )
 _SHELL_META = {"&&", "||", ";", "|", "&", ">", ">>", "<", "<<", "$(", "`"}
+
+# 탈출구: codex 모드 토글/킬스위치 명령은 항상 허용한다.
+# 그렇지 않으면 codex-on 가드가 codex-off가 쓰는 rm/touch 명령을 막아 데드락이 된다.
+_CODEX_FLAG_RE = re.compile(r"codex_(?:mode_on|native_on)_|router_enforcer\.off|gamma_guard\.off")
+_ESCAPE_FORBIDDEN = ("curl", "wget", "nc ", "ssh", "scp", "eval", "sudo", "node", "bash ", "/bin/sh", " sh ", "python")
+_ESCAPE_VERBS = {"rm", "touch", "mkdir", "echo", "true", ":"}
+
+
+def _is_codex_escape(command):
+    """codex 상태 플래그·킬스위치 파일만 건드리는 rm/touch/mkdir/echo 조합이면 허용.
+    &&·세션변수 가드(: "${...:?...}")가 섞여 있어도 통과시킨다."""
+    if not command:
+        return False
+    if not _CODEX_FLAG_RE.search(command):
+        return False
+    low = command.lower()
+    if any(tok in low for tok in _ESCAPE_FORBIDDEN):
+        return False
+    for seg in re.split(r"&&|\|\||;", command):
+        seg = seg.strip()
+        if not seg:
+            continue
+        head = seg.split()[0].strip()
+        if head in _ESCAPE_VERBS or head.startswith(":"):
+            continue
+        return False
+    return True
 
 
 def _session_id(payload):
@@ -107,12 +135,17 @@ def main():
 
     if tool_name == "Bash":
         command = _tool_input(payload).get("command", "")
-        if _bash_allowed(command):
+        if _bash_allowed(command) or _is_codex_escape(command):
             return 0
         return _deny(
             "codex-on: Bash 직접 실행은 금지입니다. 실작업은 mcp__codex__codex로 위임하세요. "
             "검증용 git status/diff/branch/log, py_compile만 허용됩니다. MCP 실패 시 fallback 금지."
         )
+
+    if tool_name == "Skill":
+        skill = str(_tool_input(payload).get("skill", ""))
+        if skill in {"codex-off", "codex-on", "codex-model"}:
+            return 0
 
     if tool_name in _DENY_TOOLS:
         return _deny(
