@@ -217,7 +217,7 @@ def main() -> None:
                 " → 조회/탐색: model=\"gpt-5.4-mini\" sandbox=\"read-only\","
                 " 코딩/구현/분석: model=\"gpt-5.4\" sandbox=\"workspace-write\","
                 " 리뷰/설계/보안: model=\"gpt-5.5\" sandbox=\"read-only\"."
-                " 판단·검수·대화는 Claude 유지. MCP 미동작 시 fallback=ccp-gpt 서브에이전트."
+                " 판단·검수·대화는 Claude 유지. MCP 미동작 시 직접 처리·ccp fallback 금지."
             )
 
         print(

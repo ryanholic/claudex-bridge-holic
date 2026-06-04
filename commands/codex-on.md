@@ -34,27 +34,27 @@ print(f"세션 제목 → {state['name']}")
 PYEOF
 ```
 
-이 세션에서만 **Codex 강제 위임 모드**를 활성화한다. 새 claude-codex 세션은 기본 OFF 상태로 시작한다.
+이 세션에서 **Codex MCP 강제 위임 모드**를 활성화한다. 새 native 세션도 SessionStart hook으로 자동 ON 상태가 된다.
 
 ## 의무 위임 (직접 처리 금지)
 
 | 작업 유형 | 위임 대상 |
 |---|---|
-| 웹 리서치 / 라이브러리 조사 / 외부 정보 / 최신 동향 | **codex-research** |
-| 500줄 이상 파일 읽기 / 낯선 디렉토리 탐색 | **codex-reader** |
-| 30줄 이상 코드 신규 작성 / 기능 구현 / 스크립트 생성 | **codex-coder** |
-| 코드 리뷰 / 적대적 검토 | **codex-reviewer** |
+| 파일 탐색 / grep / 조회 / 단순 질문 | `mcp__codex__codex(model="gpt-5.4-mini", sandbox="read-only")` |
+| 코딩 / 구현 / 버그 수정 / 분석 | `mcp__codex__codex(model="gpt-5.4", sandbox="workspace-write")` |
+| 코드 리뷰 / 설계 검토 / 보안 감사 | `mcp__codex__codex(model="gpt-5.5", sandbox="read-only")` |
 
 ## 금지
 
-- training knowledge로 외부 시스템·라이브러리 현황 직접 답변
-- 500줄 이상 파일 직접 Read
-- 30줄 이상 코드 직접 작성
+- 직접 Read/Bash/Edit/Write로 실작업 처리
+- Agent/ccp-gpt fallback
+- MCP 실패 후 직접 처리
 
 ## 규칙
 
-- 에이전트 반환 `▸ {name} · {model}` 헤더를 답변에 그대로 유지한다.
-- 위임 결과가 불충분하면 재위임하거나 보완한다. 직접 처리로 대체하지 않는다.
+- 모든 호출은 `approval-policy="never"`, `cwd="<대상 repo 절대경로>"`를 지정한다.
+- codex가 산출물을 만들면 Claude는 mtime·git diff·필요 최소 Read로 검증만 한다.
+- MCP 실패 시 실패 원인과 재시도 조건만 보고한다. 직접 처리로 대체하지 않는다.
 - `/codex-off` 로 해제할 수 있다.
 
-**Codex 모드 ON. 이후 해당 작업은 모두 Codex 서브에이전트로 위임한다.**
+**Codex MCP 모드 ON. 이후 실작업은 모두 `mcp__codex__codex`로 위임한다.**

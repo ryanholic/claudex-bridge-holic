@@ -16,7 +16,7 @@ if [ -f "$HOME/.claude/codex_mode_on_${session_id}" ]; then
 - 리뷰/설계/보안감사    → model="gpt-5.5",      sandbox="read-only"
 codex가 결과 텍스트를 직접 반환. 산출물(파일)은 mtime·git diff로 직접 검증 후에만 완료 처리.
 판단·계획·검수·Ryan 커뮤니케이션은 Claude가 직접 유지(순수 라우터화 금지 — 거짓 완료를 잡는 주체).
-MCP 미동작 시 fallback: Agent(subagent_type="ccp-gpt-5-4"/"ccp-gpt-5-4-mini"/"ccp-gpt-5-5").
+MCP 미동작 시 직접 처리·ccp fallback 금지. 실패 원인과 재시도 조건만 보고.
 해제: /codex-off
 EOF
 fi
