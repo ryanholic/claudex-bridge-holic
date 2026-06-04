@@ -9,11 +9,18 @@ import sys
 
 # --- 키워드 패턴 ---
 
-# advisor: 사용자 명시 요청 — 최우선 체크
-_ADVISOR = re.compile(
-    r"어드바이저|advisor|오푸스\s*리뷰|opus\s*리뷰|오푸스로|opus로",
+# CCP Opus direct: 사용자 명시 요청 — advisor보다 우선 체크
+_OPUS_DIRECT = re.compile(
+    r"(?:"
+    r"(?:오푸스|오퍼스|opus|claude\s*opus|opus\s*4\.8)\s*(?:로|에게|한테)\s*(?:.{0,24})?(?:리뷰|검토|봐줘|의견|판단|세컨드\s*오피니언|second\s*opinion)"
+    r"|(?:리뷰|검토|봐줘|의견|판단|세컨드\s*오피니언|second\s*opinion)\s*(?:받아|받고|시켜|해줘|해봐|맡겨)\s*(?:.{0,24})?(?:오푸스|오퍼스|opus|claude\s*opus|opus\s*4\.8)"
+    r"|(?:ask|run)\s+(?:claude\s*opus|opus)\s+to\s+(?:review|check)"
+    r")",
     re.I,
 )
+
+# advisor: 사용자 명시 요청 — 최우선 체크
+_ADVISOR = re.compile(r"어드바이저|advisor", re.I)
 
 # heavy: 설계·복잡 추론·리뷰·보안
 _HEAVY = re.compile(
@@ -74,10 +81,12 @@ def _spark_classify(prompt: str) -> str:
 
 
 def classify(prompt: str) -> tuple[str, bool]:
-    """(tier, needs_context) 반환. tier: 'heavy'|'medium'|'light'"""
+    """(tier, needs_context) 반환. tier: 'opus_direct'|'advisor'|'heavy'|'medium'|'light'"""
     # 슬래시커맨드는 라우터 차단 대상 아님 — 항상 light로 통과
     if prompt.strip().startswith("/"):
         return "light", False
+    if _OPUS_DIRECT.search(prompt):
+        return "opus_direct", False
     if _ADVISOR.search(prompt):
         return "advisor", False
     # heavy 우선
@@ -96,10 +105,18 @@ def classify(prompt: str) -> tuple[str, bool]:
 
 
 def build_hint(tier: str, needs_context: bool) -> str:
+    if tier == "opus_direct":
+        return (
+            "【모델 라우터 — CCP 명시 Opus 리뷰】"
+            " 사용자가 Opus에게 직접 리뷰/검토를 지시했습니다."
+            " → CCP 세션에서는 advisor()와 `Agent(subagent_type=\"claude-opus\")`를 쓰지 마세요."
+            " 사용자 요청 본문을 temp prompt file로 저장한 뒤 Bash에서 `ccp-opus-direct <prompt-file>`를 실행하세요."
+            " 실패 시 Codex/advisor로 fallback하지 말고 실패 그대로 보고하세요."
+        )
     if tier == "advisor":
         return (
             "【모델 라우터 — advisor】"
-            " 사용자가 명시적으로 advisor/Opus를 요청했습니다."
+            " 사용자가 명시적으로 advisor를 요청했습니다."
             " → 즉시 advisor() 를 호출하세요."
         )
     if tier == "heavy":
@@ -137,6 +154,9 @@ def build_hint(tier: str, needs_context: bool) -> str:
 
 
 def main() -> None:
+    if os.environ.get("CLAUDE_OPUS_DIRECT_ACTIVE") == "1":
+        sys.exit(0)
+
     raw = os.environ.get("CLAUDE_HOOK_CONTEXT", "") or sys.stdin.read()
     try:
         ctx = json.loads(raw)
@@ -174,7 +194,9 @@ def main() -> None:
     codex_mode_flag = _Path.home() / f".claude/codex_mode_on_{codex_mode_session}"
 
     if codex_mode_flag.exists():
-        if tier == "heavy":
+        if tier in {"opus_direct", "advisor"}:
+            additional_context = build_hint(tier, needs_context)
+        elif tier == "heavy":
             additional_context = (
                 "【모델 라우터 — CODEX 강제 위임 🔴 heavy】"
                 " 이 작업은 반드시 `mcp__codex__codex(model=\"gpt-5.5\", sandbox=\"read-only\", approval-policy=\"never\", cwd=<대상repo>)` 로 위임하세요."

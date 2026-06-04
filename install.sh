@@ -114,6 +114,7 @@ install_hook "$REPO_DIR/hooks/pre_agent_claude_redirect.py"  "$HOOKS_DIR/pre_age
 install_hook "$REPO_DIR/hooks/gamma_delegation_guard.py"     "$HOOKS_DIR/gamma_delegation_guard.py"  "gamma_delegation_guard.py (γ delegation verify+dedup)"
 mkdir -p "$HOOKS_DIR/bin"
 install_hook "$REPO_DIR/hooks/bin/codex_timed.sh"            "$HOOKS_DIR/bin/codex_timed.sh"         "codex_timed.sh (γ worker wall-clock timeout)"
+install_hook "$REPO_DIR/bin/ccp_opus_direct.sh"              "$LOCAL_BIN/ccp-opus-direct"             "ccp-opus-direct (CCP Opus direct helper)"
 
 # NOTE: gamma_delegation_guard.py는 settings.json의 PreToolUse/PostToolUse "Agent" matcher에
 # 등록해야 동작합니다 (install.sh는 settings.json hook 등록을 관리하지 않음 — 기존 훅과 동일).
