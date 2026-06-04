@@ -115,6 +115,9 @@ install_hook "$REPO_DIR/hooks/gamma_delegation_guard.py"     "$HOOKS_DIR/gamma_d
 mkdir -p "$HOOKS_DIR/bin"
 install_hook "$REPO_DIR/hooks/bin/codex_timed.sh"            "$HOOKS_DIR/bin/codex_timed.sh"         "codex_timed.sh (γ worker wall-clock timeout)"
 install_hook "$REPO_DIR/bin/ccp_opus_direct.sh"              "$LOCAL_BIN/ccp-opus-direct"             "ccp-opus-direct (CCP Opus direct helper)"
+install_hook "$REPO_DIR/bin/opus.sh"                         "$LOCAL_BIN/opus"                       "opus (native Opus env-isolated helper)"
+install_hook "$REPO_DIR/bin/claude_native.sh"                "$LOCAL_BIN/claude-native"              "claude-native (native Claude env scrubber)"
+install_hook "$REPO_DIR/bin/claude_start.sh"                 "$LOCAL_BIN/claude-start"               "claude-start (tmux native Claude env scrubber)"
 
 # NOTE: gamma_delegation_guard.py는 settings.json의 PreToolUse/PostToolUse "Agent" matcher에
 # 등록해야 동작합니다 (install.sh는 settings.json hook 등록을 관리하지 않음 — 기존 훅과 동일).
