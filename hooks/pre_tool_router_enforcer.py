@@ -21,6 +21,9 @@ _ALWAYS_ALLOW = {
 }
 
 # codex-on에서 직접 실작업으로 새기 쉬운 도구.
+# WebSearch/WebFetch는 제외: codex worker는 네트워크 격리(전용 CODEX_HOME 최소 config +
+# read-only 샌드박스)라 웹검색이 구조적으로 불가 → deny하면 갈 곳 없는 데드락이 된다.
+# 웹검색/페치는 정보 수집(판단의 입력)이며 토큰 비용도 적어 차단 이득이 없다.
 _DENY_TOOLS = {
     "Edit",
     "Write",
@@ -28,8 +31,6 @@ _DENY_TOOLS = {
     "EnterPlanMode",
     "ExitPlanMode",
     "Skill",
-    "WebSearch",
-    "WebFetch",
     "Workflow",
     "NotebookEdit",
 }
