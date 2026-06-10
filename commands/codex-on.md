@@ -6,6 +6,7 @@
 
 ```bash
 python3 - <<"PYEOF"
+# CODEX_TOGGLE_TITLE_UPDATE — enforcer 예외 마커 (토글 제목 갱신)
 import json, os, re
 from pathlib import Path
 sid = os.environ.get("CLAUDE_CODE_SESSION_ID", "")

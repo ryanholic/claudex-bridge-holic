@@ -136,6 +136,10 @@ def main():
 
     if tool_name == "Bash":
         command = _tool_input(payload).get("command", "")
+        # /codex-on·/codex-off 커맨드의 세션 제목 갱신 heredoc은 항상 허용.
+        # python 금지어에 걸려 차단되면 토글 자체가 깨지므로 전용 마커로 예외 처리.
+        if "CODEX_TOGGLE_TITLE_UPDATE" in command:
+            return 0
         if _bash_allowed(command) or _is_codex_escape(command):
             return 0
         return _deny(

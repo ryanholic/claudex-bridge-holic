@@ -107,7 +107,6 @@ install_hook() {
 }
 
 install_hook "$REPO_DIR/hooks/codex_mode_reminder.sh"        "$UPS_DIR/codex_mode_reminder.sh"       "codex_mode_reminder.sh"
-install_hook "$REPO_DIR/hooks/codex_auto_on.sh"              "$HOOKS_DIR/codex_auto_on.sh"           "codex_auto_on.sh (SessionStart auto-on)"
 install_hook "$REPO_DIR/hooks/codex_tier_writer.py"          "$UPS_DIR/codex_tier_writer.py"         "codex_tier_writer.py (tier → enforcer)"
 install_hook "$REPO_DIR/hooks/auto_model_router.py"          "$UPS_DIR/auto_model_router.py"         "auto_model_router.py (routing hints)"
 install_hook "$REPO_DIR/hooks/pre_tool_router_enforcer.py"   "$HOOKS_DIR/pre_tool_router_enforcer.py" "pre_tool_router_enforcer.py (write blocker)"
