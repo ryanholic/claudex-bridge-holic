@@ -76,6 +76,51 @@ def _is_codex_escape(command):
     return True
 
 
+# 본 세션이 codex-on이어도 직접 커밋·푸시할 수 있게 git 워크플로는 허용한다.
+# codex worker는 .git 쓰기가 막혀(index.lock) 커밋·푸시를 못 하므로 본 세션이 처리해야 한다.
+_GIT_SAFE_SUB = {
+    "add", "commit", "push", "status", "diff", "branch",
+    "log", "stash", "fetch", "pull", "show", "rev-parse",
+}
+
+
+def _is_git_workflow(command):
+    """cd + git(안전 서브커맨드)로만 구성된 명령이면 허용.
+    rm/curl/python 등 다른 실행명이 섞이거나 --force/--hard/reset이면 거부(다른 가드에 맡김)."""
+    try:
+        parts = shlex.split(command or "")
+    except ValueError:
+        return False
+    if not parts or "git" not in parts:
+        return False
+    if "--force" in parts or "-f" in parts or "--hard" in parts:
+        return False
+    expect_cmd = True
+    i, n = 0, len(parts)
+    while i < n:
+        tok = parts[i]
+        if tok in ("&&", "||", ";", "|"):
+            expect_cmd = True
+            i += 1
+            continue
+        if expect_cmd:
+            if tok == "cd":
+                pass  # cd <path> 허용
+            elif tok == "git":
+                sub = parts[i + 1] if i + 1 < n else ""
+                if sub not in _GIT_SAFE_SUB:
+                    return False
+            else:
+                return False  # git/cd 외 실행명 → 거부
+            expect_cmd = False
+            i += 1
+            while i < n and parts[i] not in ("&&", "||", ";", "|"):
+                i += 1
+            continue
+        i += 1
+    return True
+
+
 def _session_id(payload):
     return payload.get("session_id") or os.environ.get("CLAUDE_CODE_SESSION_ID") or "unknown"
 
@@ -140,11 +185,12 @@ def main():
         # python 금지어에 걸려 차단되면 토글 자체가 깨지므로 전용 마커로 예외 처리.
         if "CODEX_TOGGLE_TITLE_UPDATE" in command:
             return 0
-        if _bash_allowed(command) or _is_codex_escape(command):
+        if _bash_allowed(command) or _is_codex_escape(command) or _is_git_workflow(command):
             return 0
         return _deny(
             "codex-on: Bash 직접 실행은 금지입니다. 실작업은 mcp__codex__codex로 위임하세요. "
-            "검증용 git status/diff/branch/log, py_compile만 허용됩니다. MCP 실패 시 fallback 금지."
+            "검증용 git status/diff/branch/log·py_compile, 커밋·푸시(git add/commit/push)는 허용됩니다. "
+            "MCP 실패 시 fallback 금지."
         )
 
     if tool_name == "Skill":
