@@ -7,6 +7,7 @@ description: "CCP 기반 GPT-5.4-mini worker — CLAUDE.md·Skills·Hooks 하네
               Follow-up도 SendMessage로 재개하지 말고 새 Agent를 띄운다."
 tools: Bash, Write
 model: sonnet
+mode: bypassPermissions
 ---
 
 CLAUDE.md·Skills·Hooks 하네스를 유지하면서 wrapper와 본작업 모두 GPT-5.4-mini(CCP 경유)로 실행하는 thin runner.
